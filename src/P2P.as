@@ -12,17 +12,13 @@ package {
 	//--- imports ----------------------------------------------------
 	
 	import flash.display.Sprite;
-	import flash.display.Stage;
 	import flash.events.NetStatusEvent;
 	import flash.external.ExternalInterface;
 	import flash.net.GroupSpecifier;
 	import flash.net.NetConnection;
 	import flash.net.NetGroup;
-	import flash.net.NetGroupReceiveMode;
-	import flash.net.NetGroupReplicationStrategy;
 	import flash.net.NetStream;
 	import flash.system.Security;
-	import flash.utils.getTimer;
 	
 	
 	//--- class ------------------------------------------------------
@@ -58,7 +54,9 @@ package {
 			ExternalInterface.addCallback( "joinGroup", joinGroup );
 			ExternalInterface.addCallback( "post", post );
 			ExternalInterface.addCallback( "stream", stream );
-			ExternalInterface.addCallback( "replicate", replicate );
+			ExternalInterface.addCallback( "addHaveObjects", addHaveObjects);
+			ExternalInterface.addCallback( "addWantObjects", addWantObjects);
+			ExternalInterface.addCallback( "writeRequestedObject", writeRequestedObject);
 			
 			m_StreamsIn = {};
 		}
@@ -78,7 +76,6 @@ package {
 			m_NetConnection.addEventListener( NetStatusEvent.NET_STATUS, onNetStatus );
 			m_NetConnection.connect( uri );
 		}
-		
 		
 		//--- join group ---
 		
@@ -142,13 +139,37 @@ package {
 		}
 		
 		
-		//--- replicate ---
-		
-		public function replicate( message:Object ):void {
-			// todo: 
-			// http://www.flashrealtime.com/file-share-object-replication-flash-p2p/
+		/**
+		 * Adds objects from startIndex through endIndex, to the set of objects
+		 * this node advertises to neighbors as objects for which it fulfills
+		 * requests. By default, the Have set is empty. Indices must be whole
+		 * numbers from 0 through 9007199254740992.
+		 * @link http://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/flash/net/NetGroup.html#addHaveObjects()
+		 */		
+		public function addHaveObjects(startIndex:Number, endIndex:Number):void {
+			m_NetGroup.addHaveObjects(startIndex, endIndex);
 		}
 
+		/**
+		 * Adds objects from startIndex through endIndex, to the set of objects
+		 * to retrieve. Indices must be whole numbers from 0 through 
+		 * 9007199254740992. By default, the Want set is empty.
+		 * @link http://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/flash/net/NetGroup.html#addWantObjects()
+		 */
+		public function addWantObjects(startIndex:Number, endIndex:Number):void {
+			m_NetGroup.addHaveObjects(startIndex, endIndex);
+		}
+		
+		/**
+		 * Satisfies the request as received by NetStatusEvent NetGroup.Replication.Request 
+		 * for an object previously advertised with the addHaveObjects() method. 
+		 * The object can be any of the following: An Object, an int, a Number,
+		 * and a String. The object cannot be a MovieClip.
+		 * @link http://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/flash/net/NetGroup.html#writeRequestedObject()
+		 */
+		public function writeRequestedObject(requestID:int, object:Object):void {
+			m_NetGroup.writeRequestedObject(requestID, object);
+		}
 		
 		//--- call ---
 		
@@ -168,6 +189,12 @@ package {
 					ExternalInterface.call( "P2PRelay", m_Id, "onConnect", { sucess: true } );
 					break;
 				
+				case "NetGroup.Replication.Fetch.Result":
+					callJS("onObjectReceived", e.info);
+					break;
+				case "NetGroup.Replication.Fetch.Failed":
+					callJS("onObjectReceiveFailed", e.info);
+					break;
 				case "NetConnection.Connect.Rejected":
 				case "NetConnection.Connect.Failed":
 				case "NetConnection.Connect.Closed":
